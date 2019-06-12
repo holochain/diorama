@@ -1,20 +1,19 @@
 import * as colors from 'colors'
 
-import {ScenarioFn} from './types'
+import {ScenarioFn, ScenarioFnCustom} from './types'
 
-type Runner = (ScenarioFn) => Promise<void>
 
-export const simpleExecutor = (run: Runner, f, desc) => {
+export const simpleDescription = (next, f, desc) => {
   console.log(colors.yellow(`§`), colors.yellow.underline(`desc`))
-  run(f)
+  next(f)
 }
 
-export const tapeExecutor = tape => (run: Runner, f, desc) => new Promise((resolve, reject) => {
+export const tapeExecutor = tape => (next, f, desc) => new Promise((resolve, reject) => {
   if (f.length !== 3) {
     reject("tapeMiddleware requires scenario functions to take 3 arguments, please check your scenario definitions.")
   }
   tape(desc, t => {
-    run((s, ins) => f(s, t, ins))
+    next((s, ins) => f(s, t, ins))
     .catch((err) => {
       try {
         // Include stack trace from actual test function, but all on one line.
@@ -30,3 +29,39 @@ export const tapeExecutor = tape => (run: Runner, f, desc) => new Promise((resol
     })
   })
 })
+
+/**
+ * Middleware to retrofit each instance with a `callSync` method
+ */
+export const callSyncMiddleware = (next, f, desc) => next((s, ins) => {
+  // callSync "polyfill"
+  Object.values(ins).forEach((i: any) => {
+    i.callSync = async (...args) => {
+        const ret = await i.call(...args)
+        await s.consistent()
+        return ret
+    }
+  })
+  return f(s, ins)
+})
+
+/**
+ * Middleware to retrofit each instance with an `agentId` member,
+ * equivalent to the `agentAddress`
+ */
+export const agentIdMiddleware = (next, f, desc) => next((s, ins) => {
+    // agentId "polyfill"
+  Object.values(ins).forEach((i: any) => {
+    i.agentId = i.agentAddress
+  })
+  return f(s, ins)
+})
+
+
+export const combine = (...ms) => async (next, f, desc) => {
+  let g = f
+  for (const m of ms) {
+    const g = await new Promise(next => m(next, g, desc))
+  }
+  return g
+}
