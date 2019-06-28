@@ -7,9 +7,11 @@ const getPort = require('get-port')
 
 const colors = require('colors/safe')
 
+const _ = require('lodash')
+
 import {Signal} from '@holochain/hachiko'
 import {promiseSerial, delay} from './util'
-import {InstanceConfig} from './types'
+import * as T from './types'
 import {DnaInstance} from './instance'
 import logger from './logger'
 
@@ -41,19 +43,20 @@ export class Conductor {
   dnaIds: Set<string>
   instanceMap: {[name: string]: DnaInstance}
   opts: any
-  callAdmin: any
+  name: string
+  externalUrl: string
   handle: any
   dnaNonce: number
   onSignal: (any) => void
 
-  runningInstances: Array<InstanceConfig>
+  runningInstances: Array<T.InstanceConfig>
   callZome: any
   testPort: number
   adminPort: number
 
   isInitialized: boolean
 
-  constructor (connect, startNonce, opts: ConductorOpts) {
+  constructor (connect, externalConductor: T.ExternalConductor, opts: ConductorOpts) {
     this.webClientConnect = connect
     this.agentIds = new Set()
     this.dnaIds = new Set()
@@ -61,8 +64,19 @@ export class Conductor {
     this.opts = opts
     this.handle = null
     this.runningInstances = []
-    this.dnaNonce = startNonce
+    this.dnaNonce = 1
     this.onSignal = opts.onSignal
+    this.name = externalConductor.name
+    this.externalUrl = externalConductor.url
+    logger.info("externalConductor: %j", externalConductor)
+  }
+
+  initialize = async (): Promise<void> => {
+    if (!this.isInitialized) {
+      await this.connectAdmin(this.externalUrl)
+      this.isInitialized = true
+    }
+    return Promise.resolve()
   }
 
   isRunning = () => {
@@ -72,30 +86,52 @@ export class Conductor {
   testInterfaceUrl = () => `ws://localhost:${this.testPort}`
   testInterfaceId = () => `test-interface-${this.testPort}`
 
-  connectAdmin = async () => {
-    const { call, onSignal } = await this.webClientConnect({url: wsUrl(this.adminPort)})
+  connectAdmin = async (url) => {
+    logger.info("Trying to connect to conductor: %s", url)
+    const { call, onSignal } = await this.webClientConnect({url})
+    logger.info("Connected.")
     this.callAdmin = method => async params => {
-      logger.debug(`${colors.yellow.underline("calling")} %s`, method)
+      logger.debug(`${colors.yellow.bold("[setup call on %s]:")} ${colors.yellow.underline("%s")}`, this.name, method)
       logger.debug(JSON.stringify(params, null, 2))
       const result = await call(method)(params)
-      logger.debug(`${colors.yellow.bold('->')} %j`, result)
+      logger.debug(`${colors.yellow.bold('-> %j')}`, result)
       return result
     }
 
-    onSignal(this.onSignal)
+    onSignal(({signal, instance_id}) => {
+      if (signal.signal_type !== 'Consistency') {
+        return
+      }
+
+      // take off the nonced suffix
+      // XXX, NB, this '-' magic is because of the nonced instance IDs
+      // TODO: deal with this more reasonably
+      const ix = instance_id.lastIndexOf('-')
+      const instanceId = instance_id.substring(0, ix)
+
+      this.onSignal({
+        conductorName: this.name,
+        instanceId: instanceId,
+        signal
+      })
+    })
+  }
+
+  callAdmin: ((string) => (any) => Promise<any>) = method => async params => {
+    throw new Error("callAdmin not set up yet! This is because hc-web-client has not yet established a websocket connection.")
   }
 
   connectTest = async () => {
     const url = this.testInterfaceUrl()
     const { callZome } = await this.webClientConnect({url})
     this.callZome = (...args) => params => new Promise((resolve, reject) => {
-      logger.debug(colors.cyan.underline("calling"), ...args)
-      logger.debug(params)
+      logger.debug(`${colors.cyan.bold("zome call [%s]:")} ${colors.cyan.underline("{id: %s, zome: %s, fn: %s}")}`, this.name, args[0], args[1], args[2])
+      logger.debug(`${colors.cyan.bold("params:")} ${colors.cyan.underline("%s")}`, JSON.stringify(params, null, 2))
       const timeout = this.opts.zomeCallTimeout || DEFAULT_ZOME_CALL_TIMEOUT
       const timer = setTimeout(() => reject(`zome call timed out after ${timeout / 1000} seconds: ${args.join('/')}`), timeout)
       const promise = callZome(...args)(params).then(result => {
         clearTimeout(timer)
-        logger.debug(colors.cyan.bold('->'), result)
+        logger.debug(colors.cyan.bold('->'), JSON.parse(result))
         resolve(result)
       })
     })
@@ -114,32 +150,17 @@ export class Conductor {
     })
   }
 
-  initialize = async () => {
-    if (!this.isInitialized) {
-      try {
-        this.adminPort = await this.getInterfacePort()
-        await this.spawn()
-        logger.info(colors.green.bold("test conductor spawned"))
-        await this.connectAdmin()
-        logger.info(colors.green.bold("test conductor connected to admin interface"))
-      } catch (e) {
-        logger.error("Error when initializing!")
-        logger.error(e)
-        this.kill()
-      }
-      this.isInitialized = true
-    }
-  }
-
   getInterfacePort = async () => {
     const port = await getPort()
     // const port = await getPort({port: getPort.makeRange(5555, 5999)})
-    logger.info("using port", port)
+    logger.info("using port, %n", port)
     return port
   }
 
   setupNewInterface = async () => {
+    console.debug("setupNewInterface :: getInterfacePort")
     this.testPort = await this.getInterfacePort()
+    console.debug("setupNewInterface :: callAdmin")
     await this.callAdmin('admin/interface/add')({
       id: this.testInterfaceId(),
       admin: false,
@@ -157,7 +178,7 @@ export class Conductor {
 
     if (!this.dnaIds.has(dnaConfig.id)) {
       const installDnaResponse = await this.callAdmin('admin/dna/install_from_file')(dnaConfig)
-      logger.silly('installDnaResponse', installDnaResponse)
+      logger.silly('installDnaResponse: %j', installDnaResponse)
       const dnaAddress = installDnaResponse.dna_hash
       this.dnaIds.add(dnaConfig.id)
       this.instanceMap[nonNoncifiedInstanceId].dnaAddress = dnaAddress
@@ -169,12 +190,12 @@ export class Conductor {
   /**
    * Calls the conductor RPC functions to initialize it according to the instances
    */
-  setupInstances = async (instanceConfigs) => {
+  setupInstances = async (instanceConfigs: Array<T.InstanceConfig>) => {
     if (this.isRunning()) {
       throw "Attempting to run a new test while another test has not yet been torn down"
     }
     for (const instanceConfig of instanceConfigs) {
-      const instance = JSON.parse(JSON.stringify(instanceConfig))
+      const instance = _.cloneDeep(instanceConfig)
       const nonNoncifiedInstanceId = instance.id
       instance.id += '-' + this.dnaNonce
       if (this.instanceMap[nonNoncifiedInstanceId]) {
@@ -186,7 +207,7 @@ export class Conductor {
       }
       if (!this.agentIds.has(instance.agent.id)) {
         const addAgentResponse = await this.callAdmin('test/agent/add')(instance.agent)
-        logger.silly('addAgentResponse', addAgentResponse)
+        logger.silly('addAgentResponse: %j', addAgentResponse)
         const agentAddress = addAgentResponse.agent_address
         this.agentIds.add(instance.agent.id)
         this.instanceMap[nonNoncifiedInstanceId].agentAddress = agentAddress
@@ -242,13 +263,13 @@ export class Conductor {
     return bridge
   }
 
-  setupBridges = async (bridgeConfigs) => {
+  setupBridges = async (bridgeConfigs: Array<T.BridgeConfig>) => {
     for (const bridgeConfig of bridgeConfigs) {
       await this.callAdmin('admin/bridge/add')(this.noncifyBridgeConfig(bridgeConfig))
     }
   }
 
-  startInstances = async (instanceConfigs) => {
+  startInstances = async (instanceConfigs: Array<T.InstanceConfig>) => {
     for (const instanceConfig of instanceConfigs) {
       const instance = JSON.parse(JSON.stringify(instanceConfig))
       instance.id += '-' + this.dnaNonce
@@ -256,42 +277,43 @@ export class Conductor {
     }
   }
 
-  teardownBridges = async (bridgeConfigs) => {
+  teardownBridges = async (bridgeConfigs: Array<T.BridgeConfig>) => {
     for (const bridgeConfig of bridgeConfigs) {
       await this.callAdmin('admin/bridge/remove')(this.noncifyBridgeConfig(bridgeConfig))
     }
   }
 
-  run = async (instanceConfigs, bridgeConfigs, fn) => {
-    logger.debug('')
-    logger.debug('')
-    logger.debug("---------------------------------------------------------")
-    logger.debug("---------------------------------------------------------")
-    logger.debug("-------  starting")
-    logger.debug('')
+  prepareRun = async ({instances, bridges}: T.ConductorConfig) => {
+    logger.debug(colors.yellow.bold("---------------------------------------------------------"))
+    logger.debug(colors.yellow.bold(`-------  preparing ${this.name}`))
     logger.debug('')
     if (!this.isInitialized) {
       throw "Cannot run uninitialized conductor"
     }
     try {
+      logger.debug("prepareRun :: setupNewInterface")
       await this.setupNewInterface()
+      logger.debug("prepareRun :: connectTest")
       await this.connectTest()
-      await this.setupInstances(instanceConfigs)
-      await this.setupBridges(bridgeConfigs)
-      await this.startInstances(instanceConfigs)
+      logger.debug("prepareRun :: setupInstances")
+      await this.setupInstances(instances)
+      logger.debug("prepareRun :: setupBridges")
+      await this.setupBridges(bridges)
+      logger.debug("prepareRun :: startInstances")
+      await this.startInstances(instances)
+      logger.debug("prepareRun :: connectSignals")
       await this.connectSignals()
     } catch (e) {
       this.abort(e)
     }
-    logger.debug("Instances all set up, running test...")
-    try {
-      await fn(this.instanceMap)
-    } catch (e) {
-      this.failTest(e)
-    }
+    logger.debug(colors.yellow.bold(`-------  done preparing ${this.name}`))
+  }
 
+  cleanupRun = async ({bridges}: T.ConductorConfig) => {
+    logger.debug(colors.yellow.bold(`-------  cleaning up ${this.name}`))
+    logger.debug('')
     try {
-      await this.teardownBridges(bridgeConfigs)
+      await this.teardownBridges(bridges)
       await this.teardownInstances()
       // await this.cleanupStorage()
     } catch (e) {
@@ -299,6 +321,8 @@ export class Conductor {
     }
     logger.debug("Test done, tearing down instances...")
     logger.debug("Storage cleared...")
+    logger.debug(colors.yellow.bold(`-------  done cleaning up ${this.name}`))
+    logger.debug(colors.yellow.bold("---------------------------------------------------------"))
     this.dnaNonce += 1
   }
 
@@ -326,7 +350,7 @@ export class Conductor {
   }
 
   kill () {
-    this.handle.kill()
+    logger.info("TODO: kill?")
   }
 
   abort (msg) {

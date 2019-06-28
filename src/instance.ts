@@ -1,6 +1,7 @@
 import * as colors from 'colors'
 
 import logger from './logger'
+import * as T from './types'
 
 export class DnaInstance {
 
@@ -20,8 +21,8 @@ export class DnaInstance {
 
   // internally calls `this.conductor.call`
   async call (zome, fn, params) {
-      const result = await this.callZome(this.id, zome, fn)(params)
-      logger.debug(colors.blue.inverse("zome call"), this.id, zome, fn, params)
+    const result = await this.callZome(this.id, zome, fn)(params)
+    logger.debug(colors.blue.inverse("zome call"), {id: this.id, zome, fn, params})
     try {
       return JSON.parse(result)
     } catch (e) {
@@ -30,3 +31,6 @@ export class DnaInstance {
     }
   }
 }
+
+export type InstanceMap = T.ObjectS<DnaInstance>
+export type ConductorMap = T.ObjectS<InstanceMap>
