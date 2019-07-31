@@ -7,6 +7,7 @@ import {connect} from '@holochain/hc-web-client'
 import {Waiter, FullSyncNetwork, NodeId, NetworkMap, Signal} from '@holochain/hachiko'
 import {InstanceConfig, BridgeConfig} from './types'
 import {Conductor} from './conductor'
+import {DpkiConfig, Config} from './config'
 import {ScenarioApi} from './api'
 import {simpleExecutor} from './executors'
 import {identity} from './util'
@@ -20,6 +21,7 @@ const MIN_POOL_SIZE = 1
 type DioramaConstructorParams = {
   instances?: any,
   bridges?: Array<BridgeConfig>,
+  dpki?: DpkiConfig,
   middleware?: any,
   executor?: any,
   debugLog?: boolean,
@@ -29,14 +31,21 @@ export const DioramaClass = Conductor => class Diorama {
   instanceConfigs: Array<InstanceConfig>
   bridgeConfigs: Array<BridgeConfig>
   conductor: Conductor
+  dpkiConfig?: DpkiConfig
   scenarios: Array<any>
-  middleware: any | void
-  executor: any | void
-  conductorOpts: any | void
+  middleware?: any
+  executor?: any
+  conductorOpts?: any
   waiter: Waiter
 
-  constructor ({bridges = [], instances = {}, middleware = identity, executor = simpleExecutor, debugLog = false}: DioramaConstructorParams) {
+  // config public interface, defined outside of this class
+  static dna: any
+  static dpki: any
+  static bridge: any
+
+  constructor ({bridges = [], instances = {}, dpki, middleware = identity, executor = simpleExecutor, debugLog = false}: DioramaConstructorParams) {
     this.bridgeConfigs = bridges
+    this.dpkiConfig = dpki
     this.middleware = middleware
     this.executor = executor
     this.conductorOpts = {debugLog}
@@ -76,16 +85,6 @@ export const DioramaClass = Conductor => class Diorama {
   _newConductor (): Conductor {
     return new Conductor(connect, {onSignal: this.onSignal.bind(this), ...this.conductorOpts})
   }
-
-  /**
-   * More conveniently create config for a DNA
-   */
-  static dna = (path, id = `${path}`, opts = {}) => ({ path, id, ...opts })
-
-  /**
-   * More conveniently create config for a bridge
-   */
-  static bridge = (handle, caller_id, callee_id) => ({handle, caller_id, callee_id})
 
   /**
    * scenario takes (s, instances)
@@ -159,7 +158,13 @@ export const DioramaClass = Conductor => class Diorama {
   }
 }
 
+
 export const Diorama = DioramaClass(Conductor)
+
+Diorama.dna = Config.dna
+Diorama.bridge = Config.bridge
+Diorama.dpki = (name, initParams): DpkiConfig => ({name, initParams})
+
 
 const makeInstanceConfig = (agentId, dnaConfig) => {
   return {

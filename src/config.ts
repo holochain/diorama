@@ -8,9 +8,19 @@ interface DnaConfig {
   hash?: string,
 }
 
+export type DpkiConfig = {
+  name: string,
+  initParams: any,
+}
+
+/**
+ * Minimal helper functions to create pieces of valid Conductor configuration.
+ * Some of these are exposed on the Diorama class, which constitue the public interface.
+ * This class should not be used directly by the user.
+ */
 export const Config = {
   agent: id => ({ name: id, id }),
-  dna: (path, id = `${path}`): DnaConfig => ({ path, id }),
+  dna: (path, id = `${path}`, opts = {}): DnaConfig => ({ path, id, ...opts }),
   bridge: (handle, caller, callee) => ({
     handle,
     caller_id: caller.name,
