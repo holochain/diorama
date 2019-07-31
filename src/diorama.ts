@@ -7,6 +7,7 @@ import {connect} from '@holochain/hc-web-client'
 import {Waiter, FullSyncNetwork, NodeId, NetworkMap, Signal} from '@holochain/hachiko'
 import {InstanceConfig, BridgeConfig} from './types'
 import {Conductor} from './conductor'
+import {DpkiConfig} from './config'
 import {ScenarioApi} from './api'
 import {simpleExecutor} from './executors'
 import {identity} from './util'
@@ -20,6 +21,7 @@ const MIN_POOL_SIZE = 1
 type DioramaConstructorParams = {
   instances?: any,
   bridges?: Array<BridgeConfig>,
+  dpki: DpkiConfig | null,
   middleware?: any,
   executor?: any,
   debugLog?: boolean,
@@ -36,7 +38,14 @@ export const DioramaClass = Conductor => class Diorama {
   waiter: Waiter
   startNonce: number
 
-  constructor ({bridges = [], instances = {}, middleware = identity, executor = simpleExecutor, debugLog = false}: DioramaConstructorParams) {
+  constructor ({
+    bridges = [],
+    instances = {},
+    dpki = null,
+    middleware = identity,
+    executor = simpleExecutor,
+    debugLog = false,
+  }: DioramaConstructorParams) {
     this.bridgeConfigs = bridges
     this.middleware = middleware
     this.executor = executor

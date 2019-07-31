@@ -10,6 +10,7 @@ const colors = require('colors/safe')
 import {Signal} from '@holochain/hachiko'
 import {promiseSerial, delay} from './util'
 import {InstanceConfig} from './types'
+import {DpkiConfig} from './config'
 import {DnaInstance} from './instance'
 import logger from './logger'
 
@@ -340,7 +341,27 @@ export class Conductor {
     throw e
   }
 
-  initialConfig (persistencePath, opts) {
+  initialConfig (persistencePath, dpki?: DpkiConfig, opts = {debugLog: false}) {
+    const dpkiId = 'diorama-dpki'
+    const dpkiAgentId = `${dpkiId}-agent`
+    const headerToml = !dpki ? '[]'
+      : `
+
+[[agents]]
+id = ${dpkiAgentId}
+name = ${dpkiAgentId}
+keystore_file = ${dpkiAgentId}
+public_address = ${dpkiAgentId}
+test_agent = true
+
+[[dnas]]
+id = ${dpkiId}-dna
+
+[[instances]]
+
+`
+
+
     return `
 agents = []
 dnas = []
