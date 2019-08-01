@@ -141,12 +141,13 @@ export class Conductor {
     const tmpPath = storagePath()
     const configPath = path.join(tmpPath, 'conductor-config.toml')
     const persistencePath = tmpPath
-    const config = Config.genConfig(
+    const config = Config.genConfig({
       persistencePath,
       instanceConfigs,
       bridgeConfigs,
-      this.opts.debugLog
-    )
+      dpkiConfig,
+      debugLog: this.opts.debugLog,
+    })
     fs.writeFileSync(configPath, config)
     logger.info(`Using config file at ${configPath}`)
     try {

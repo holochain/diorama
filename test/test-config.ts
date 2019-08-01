@@ -6,6 +6,8 @@ Config.getInterfacePort = () => 9000
 
 import * as test from 'tape'
 
+const persistencePath = 'path/to/persistence'
+
 const [aliceConfig, bobConfig] = ['alice', 'bob'].map(name => ({
   id: name,
   agent: Config.agent(name),
@@ -43,20 +45,53 @@ const expectedJsonConfig = {
 }
 
 test("test config json generation", async t => {
-  const instances = [aliceConfig, bobConfig]
-  const bridges = [
+  const instanceConfigs = [aliceConfig, bobConfig]
+  const bridgeConfigs = [
     Config.bridge('bridge', 'alice', 'bob')
   ]
-  const config = await Config.genJsonConfig('path/to/persistence', instances, bridges, false)
+  const config = await Config.genJsonConfig({
+    persistencePath,
+    instanceConfigs,
+    bridgeConfigs,
+  })
 
   t.deepEqual(config, expectedJsonConfig)
   t.end()
 })
 
 test("test config toml generation", async t => {
-  const instances = [aliceConfig, bobConfig]
-  const bridges = [Config.bridge('bridge', 'alice', 'bob')]
-  const toml = await Config.genConfig('path/to/persistence', instances, bridges, false)
+  const instanceConfigs = [aliceConfig, bobConfig]
+  const bridgeConfigs = [Config.bridge('bridge', 'alice', 'bob')]
+  const toml = await Config.genConfig({
+    persistencePath,
+    instanceConfigs,
+    bridgeConfigs,
+    debugLog: false
+  })
   t.ok(toml.includes('[logger]'))
+  t.end()
+})
+
+test("test config json generation with dpki", async t => {
+  const instanceConfigs = [aliceConfig, bobConfig]
+  const bridgeConfigs = [
+    Config.bridge('bridge', 'alice', 'bob')
+  ]
+  const dpkiConfig = Config.dpki('alice', {some: 'params'})
+  const config = await Config.genJsonConfig({
+    persistencePath,
+    instanceConfigs,
+    bridgeConfigs,
+    dpkiConfig
+  })
+
+  const expected = Object.assign(expectedJsonConfig, {
+    dpki: {
+      instance_id: 'alice',
+      init_params: '{"some":"params"}'
+    }
+  })
+
+  t.deepEqual(config, expected)
   t.end()
 })

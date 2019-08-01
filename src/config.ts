@@ -2,15 +2,13 @@ const child_process = require('child_process')
 const json2toml = require('json2toml')
 const getPort = require('get-port')
 
-interface DnaConfig {
-  path: string,
-  id: string,
-  hash?: string,
-}
+import {DnaConfig, InstanceConfig, BridgeConfig, DpkiConfig} from './types'
 
-export type DpkiConfig = {
-  name: string,
-  initParams: any,
+type GenJsonConfigArgs = {
+  persistencePath: string,
+  instanceConfigs: Array<InstanceConfig>,
+  bridgeConfigs: Array<BridgeConfig>,
+  dpkiConfig?: DpkiConfig,
 }
 
 /**
@@ -20,11 +18,18 @@ export type DpkiConfig = {
  */
 export const Config = {
   agent: id => ({ name: id, id }),
+
   dna: (path, id = `${path}`, opts = {}): DnaConfig => ({ path, id, ...opts }),
+
   bridge: (handle, caller, callee) => ({
     handle,
     caller_id: caller.name,
     callee_id: callee.name
+  }),
+
+  dpki: (instance_id, init_params): DpkiConfig => ({
+    instance_id,
+    init_params: JSON.stringify(init_params)
   }),
 
   instance: (agent, dna, id = agent.id) => ({
@@ -41,7 +46,7 @@ export const Config = {
     return child_process.exec('hc hash', dnaPath)
   },
 
-  async genJsonConfig (persistencePath, instanceConfigs, bridgeConfigs, debugLog) {
+  async genJsonConfig ({persistencePath, instanceConfigs, bridgeConfigs, dpkiConfig}: GenJsonConfigArgs) {
     const port = await this.getInterfacePort()
     const config: any = {
 
@@ -64,6 +69,10 @@ export const Config = {
         port: port,
       },
       instances: [] as Array<{id: string}>
+    }
+
+    if (dpkiConfig) {
+      config.dpki = dpkiConfig
     }
 
     const agentIds = new Set()
@@ -92,9 +101,9 @@ export const Config = {
     return config
   },
 
-  async genConfig (persistencePath, instanceConfigs, bridgeConfigs, debugLog) {
+  async genConfig (args: GenJsonConfigArgs & {debugLog: boolean}) {
 
-    const config = this.genJsonConfig(persistencePath, instanceConfigs, bridgeConfigs, debugLog)
+    const config = this.genJsonConfig(args)
 
     const toml = json2toml(config) + `
 [logger]
@@ -108,7 +117,7 @@ type = "debug"
   exclude = false
   pattern = "^debug/dna"
   [[logger.rules.rules]]
-  exclude = ${debugLog ? 'false' : 'true'}
+  exclude = ${args.debugLog ? 'false' : 'true'}
   pattern = ".*"
 `
     return toml

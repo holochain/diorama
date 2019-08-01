@@ -5,9 +5,9 @@ import * as _ from 'lodash'
 
 import {connect} from '@holochain/hc-web-client'
 import {Waiter, FullSyncNetwork, NodeId, NetworkMap, Signal} from '@holochain/hachiko'
-import {InstanceConfig, BridgeConfig} from './types'
+import {InstanceConfig, BridgeConfig, DpkiConfig} from './types'
 import {Conductor} from './conductor'
-import {DpkiConfig, Config} from './config'
+import {Config} from './config'
 import {ScenarioApi} from './api'
 import {simpleExecutor} from './executors'
 import {identity} from './util'
@@ -41,7 +41,7 @@ export const DioramaClass = Conductor => class Diorama {
   // config public interface, defined outside of this class
   static dna = Config.dna
   static bridge = Config.bridge
-  static dpki = (name, initParams): DpkiConfig => ({name, initParams})
+  static dpki = Config.dpki
 
   constructor ({bridges = [], instances = {}, dpki, middleware = identity, executor = simpleExecutor, debugLog = false}: DioramaConstructorParams) {
     this.bridgeConfigs = bridges

@@ -11,10 +11,10 @@ export type AgentConfig = {
   name: string,
 }
 
-export type DnaConfig = {
-  id: string,
+export interface DnaConfig {
   path: string,
-  uuid?: string,
+  id: string,
+  hash?: string,
 }
 
 export type InstanceConfig = {
@@ -27,4 +27,9 @@ export type BridgeConfig = {
   handle: string
   caller_id: string
   callee_id: string
+}
+
+export type DpkiConfig = {
+  instance_id: string,
+  init_params: any,
 }
