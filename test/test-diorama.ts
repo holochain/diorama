@@ -4,7 +4,7 @@ import {DioramaClass} from '../src/diorama'
 import * as test from 'tape'
 
 
-test('a', async t => {
+test('can run heavily mocked Diorama', async t => {
 
   class TestConductor {
     initialize() {}
