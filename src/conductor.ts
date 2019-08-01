@@ -137,11 +137,11 @@ export class Conductor {
     logger.debug("Test done.")
   }
 
-  spawn ({instanceConfigs, bridgeConfigs, dpkiConfig}) {
+  async spawn ({instanceConfigs, bridgeConfigs, dpkiConfig}) {
     const tmpPath = storagePath()
     const configPath = path.join(tmpPath, 'conductor-config.toml')
     const persistencePath = tmpPath
-    const config = Config.genConfig({
+    const config = await Config.genConfig({
       persistencePath,
       instanceConfigs,
       bridgeConfigs,
