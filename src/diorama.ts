@@ -39,9 +39,9 @@ export const DioramaClass = Conductor => class Diorama {
   waiter: Waiter
 
   // config public interface, defined outside of this class
-  static dna: any
-  static dpki: any
-  static bridge: any
+  static dna = Config.dna
+  static bridge = Config.bridge
+  static dpki = (name, initParams): DpkiConfig => ({name, initParams})
 
   constructor ({bridges = [], instances = {}, dpki, middleware = identity, executor = simpleExecutor, debugLog = false}: DioramaConstructorParams) {
     this.bridgeConfigs = bridges
@@ -112,7 +112,7 @@ export const DioramaClass = Conductor => class Diorama {
     const modifiedScenario = this.middleware(scenario)
 
     const conductor = this._newConductor()
-    await conductor.run(this.instanceConfigs, this.bridgeConfigs, (instanceMap) => {
+    await conductor.run(this as any, (instanceMap) => {
       const api = new ScenarioApi(this.waiter)
       return modifiedScenario(api, instanceMap)
     })
@@ -160,10 +160,6 @@ export const DioramaClass = Conductor => class Diorama {
 
 
 export const Diorama = DioramaClass(Conductor)
-
-Diorama.dna = Config.dna
-Diorama.bridge = Config.bridge
-Diorama.dpki = (name, initParams): DpkiConfig => ({name, initParams})
 
 
 const makeInstanceConfig = (agentId, dnaConfig) => {

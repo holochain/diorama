@@ -90,9 +90,9 @@ export class Conductor {
     })
   }
 
-  initialize = async (instanceConfigs, bridgeConfigs) => {
+  initialize = async ({instanceConfigs, bridgeConfigs, dpkiConfig}) => {
     if (!this.isInitialized) {
-      await this.spawn(instanceConfigs, bridgeConfigs)
+      await this.spawn({instanceConfigs, bridgeConfigs, dpkiConfig})
       this.interfacePort = await getPort()
       await this.connectClient()
       this.isInitialized = true
@@ -108,7 +108,7 @@ export class Conductor {
     path.join(storagePath(), 'dna'),
   ])
 
-  run = async (instanceConfigs, bridgeConfigs, fn) => {
+  run = async ({instanceConfigs, bridgeConfigs, dpkiConfig}, fn) => {
     logger.debug('')
     logger.debug('')
     logger.debug("---------------------------------------------------------")
@@ -117,7 +117,7 @@ export class Conductor {
     logger.debug('')
     logger.debug('')
     try {
-      await this.initialize(instanceConfigs, bridgeConfigs)
+      await this.initialize({instanceConfigs, bridgeConfigs, dpkiConfig})
     } catch (e) {
       this.abort(e)
     }
@@ -137,7 +137,7 @@ export class Conductor {
     logger.debug("Test done.")
   }
 
-  spawn (instanceConfigs, bridgeConfigs) {
+  spawn ({instanceConfigs, bridgeConfigs, dpkiConfig}) {
     const tmpPath = storagePath()
     const configPath = path.join(tmpPath, 'conductor-config.toml')
     const persistencePath = tmpPath

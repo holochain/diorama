@@ -9,7 +9,7 @@ test('can run heavily mocked Diorama', async t => {
   class TestConductor {
     initialize() {}
     kill() {}
-    run (instanceConfigs, bridgeConfigs, fn) {
+    run ({instanceConfigs, bridgeConfigs}, fn) {
       t.deepEqual(instanceConfigs, [
         {
           id: 'alice',
