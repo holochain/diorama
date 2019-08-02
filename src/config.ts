@@ -1,8 +1,10 @@
-const child_process = require('child_process')
-const json2toml = require('json2toml')
+const path = require('path')
+const util = require('util')
+const exec = util.promisify(require('child_process').exec)
+const TOML = require('@iarna/toml')
 const getPort = require('get-port')
 
-import {DnaConfig, InstanceConfig, BridgeConfig, DpkiConfig} from './types'
+import {AgentConfig, DnaConfig, InstanceConfig, BridgeConfig, DpkiConfig} from './types'
 
 type GenJsonConfigArgs = {
   persistencePath: string,
@@ -17,9 +19,15 @@ type GenJsonConfigArgs = {
  * This class should not be used directly by the user.
  */
 export const Config = {
-  agent: id => ({ name: id, id }),
+  agent: (id): AgentConfig => ({
+    id,
+    name: id,
+    keystore_file: id,
+    public_address: id,
+    test_agent: true,
+  } as AgentConfig),
 
-  dna: (path, id = `${path}`, opts = {}): DnaConfig => ({ path, id, ...opts }),
+  dna: (file, id = `${file}`, opts = {}): DnaConfig => ({ file, id, ...opts }),
 
   bridge: (handle, caller, callee) => ({
     handle,
@@ -42,8 +50,16 @@ export const Config = {
     return getPort()
   },
 
-  getDnaHash (dnaPath) {
-    return child_process.exec('hc hash', dnaPath)
+  async getDnaHash (dnaPath) {
+    const {stdout, stderr} = await exec('hc hash', dnaPath)
+    if (stderr) {
+      throw new Error("Error while getting hash: " + stderr)
+    }
+    const [hash] = stdout.match(/\w{46}/)
+    if (!hash) {
+      throw new Error("Could not parse hash from `hc hash` output, which follows: " + stdout)
+    }
+    return hash
   },
 
   async genJsonConfig ({persistencePath, instanceConfigs, bridgeConfigs, dpkiConfig}: GenJsonConfigArgs) {
@@ -84,14 +100,18 @@ export const Config = {
       }
       if (!dnaIds.has(instance.dna.id)) {
         if (!instance.dna.hash) {
-          instance.dna.hash = await this.getDnaHash(instance.dna.path)
+          instance.dna.hash = await this.getDnaHash(instance.dna.file)
         }
         config.dnas.push(instance.dna)
       }
       config.instances.push({
         id: instance.id,
-        agent_id: instance.agent.id,
-        dna_id: instance.dna.id,
+        agent: instance.agent.id,
+        dna: instance.dna.id,
+        storage: {
+          type: 'file',
+          path: path.join(persistencePath, instance.id)
+        }
       })
       iface.instances.push({id: instance.id})
     }
@@ -102,10 +122,8 @@ export const Config = {
   },
 
   async genConfig (args: GenJsonConfigArgs & {debugLog: boolean}) {
-
-    const config = this.genJsonConfig(args)
-
-    const toml = json2toml(config) + `
+    const config = await this.genJsonConfig(args)
+    const toml = TOML.stringify(config) + `
 [logger]
 type = "debug"
   [[logger.rules.rules]]

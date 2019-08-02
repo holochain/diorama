@@ -165,10 +165,7 @@ export const Diorama = DioramaClass(Conductor)
 const makeInstanceConfig = (agentId, dnaConfig) => {
   return {
     id: agentId,
-    agent: {
-      id: agentId,
-      name: agentId,
-    },
+    agent: Config.agent(agentId),
     dna: dnaConfig
   }
 }

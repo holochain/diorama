@@ -1,7 +1,7 @@
 import {Config} from '../src/config'
 
 // mock out the effectful bits
-Config.getDnaHash = (path) => 'fakednahash'
+Config.getDnaHash = async (path) => 'fakednahash'
 Config.getInterfacePort = () => 9000
 
 import * as test from 'tape'
@@ -9,23 +9,23 @@ import * as test from 'tape'
 const persistencePath = 'path/to/persistence'
 
 const [aliceConfig, bobConfig] = ['alice', 'bob'].map(name => ({
-  id: name,
   agent: Config.agent(name),
   dna: Config.dna(name),
+  id: name
 }))
 
 const expectedJsonConfig = {
   agents: [
-    {id: 'alice', name: 'alice'},
-    {id: 'bob', name: 'bob'},
+    Config.agent('alice'),
+    Config.agent('bob'),
   ],
   dnas: [
-    {id: 'alice', path: 'alice', hash: 'fakednahash'},
-    {id: 'bob', path: 'bob', hash: 'fakednahash'},
+    {id: 'alice', file: 'alice', hash: 'fakednahash'},
+    {id: 'bob', file: 'bob', hash: 'fakednahash'},
   ],
   instances: [
-    {id: 'alice', agent_id: 'alice', dna_id: 'alice'},
-    {id: 'bob', agent_id: 'bob', dna_id: 'bob'},
+    {id: 'alice', agent: 'alice', dna: 'alice'},
+    {id: 'bob', agent: 'bob', dna: 'bob'},
   ],
   interfaces: [{
     id: 'diorama-interface',
@@ -68,6 +68,7 @@ test("test config toml generation", async t => {
     bridgeConfigs,
     debugLog: false
   })
+  t.ok(toml.includes('[agents]'))
   t.ok(toml.includes('[logger]'))
   t.end()
 })

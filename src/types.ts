@@ -6,13 +6,15 @@ export type ScenarioFnCustom = (s: object, ins: {[id: string]: any}) => Promise<
 export type ScenarioFn = (s: ScenarioApi, ins: {[id: string]: DnaInstance}) => Promise<any>
 
 
-export type AgentConfig = {
-  id: string,
-  name: string,
+export interface AgentConfig {
+  id: string
+  name: string
+  keystore_file: string
+  public_address: string
 }
 
 export interface DnaConfig {
-  path: string,
+  file: string,
   id: string,
   hash?: string,
 }
