@@ -24,8 +24,8 @@ const expectedJsonConfig = {
     {id: 'bob', file: 'bob', hash: 'fakednahash'},
   ],
   instances: [
-    {id: 'alice', agent: 'alice', dna: 'alice'},
-    {id: 'bob', agent: 'bob', dna: 'bob'},
+    {id: 'alice', agent: 'alice', dna: 'alice', storage: { type: 'file', path: 'path/to/persistence/alice'}},
+    {id: 'bob', agent: 'bob', dna: 'bob', storage: { type: 'file', path: 'path/to/persistence/bob'}},
   ],
   interfaces: [{
     id: 'diorama-interface',
