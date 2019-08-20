@@ -4,21 +4,24 @@ import {DioramaClass} from '../src/diorama'
 import * as test from 'tape'
 
 
-test('a', async t => {
+test('can run heavily mocked Diorama', async t => {
 
   class TestConductor {
     initialize() {}
     kill() {}
-    run (instanceConfigs, bridgeConfigs, fn) {
+    run ({instanceConfigs, bridgeConfigs}, fn) {
       t.deepEqual(instanceConfigs, [
         {
           id: 'alice',
           agent: {
             id: 'alice',
-            name: 'alice'
+            name: 'alice',
+            keystore_file: 'alice',
+            public_address: 'alice',
+            test_agent: true,
           },
           dna: {
-            path: 'path',
+            file: 'path',
             id: 'name'
           }
         },
@@ -26,10 +29,13 @@ test('a', async t => {
           id: 'bob',
           agent: {
             id: 'bob',
-            name: 'bob'
+            name: 'bob',
+            keystore_file: 'bob',
+            public_address: 'bob',
+            test_agent: true,
           },
           dna: {
-            path: 'path',
+            file: 'path',
             id: 'name'
           }
         }

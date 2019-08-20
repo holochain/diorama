@@ -6,15 +6,17 @@ export type ScenarioFnCustom = (s: object, ins: {[id: string]: any}) => Promise<
 export type ScenarioFn = (s: ScenarioApi, ins: {[id: string]: DnaInstance}) => Promise<any>
 
 
-export type AgentConfig = {
-  id: string,
-  name: string,
+export interface AgentConfig {
+  id: string
+  name: string
+  keystore_file: string
+  public_address: string
 }
 
-export type DnaConfig = {
+export interface DnaConfig {
+  file: string,
   id: string,
-  path: string,
-  uuid?: string,
+  hash?: string,
 }
 
 export type InstanceConfig = {
@@ -27,4 +29,9 @@ export type BridgeConfig = {
   handle: string
   caller_id: string
   callee_id: string
+}
+
+export type DpkiConfig = {
+  instance_id: string,
+  init_params: any,
 }
